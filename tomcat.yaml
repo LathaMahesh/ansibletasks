@@ -1,0 +1,111 @@
+---
+- name: installing tomact on ubuntu machine
+  hosts: appserver
+  become: yes
+# Define variables  
+  vars:
+    tomcat_source: "https://mirrors.estointernet.in/apache/tomcat/tomcat-8/v8.5.61/bin/apache-tomcat-8.5.61.zip"
+    tomcat_download_location: "/tmp/apache-tomcat-8.5.61.zip"
+    tomcat_install_path: "/opt/tomcat"
+    user_group: tomcat
+    unzip_package: "unzip"
+    symbollic_link: /opt/tomcat/apache-tomcat-8.5.61
+    JAVA_HOME: /opt/tomcat/latest
+  tasks:
+# install JDK and other packages
+    - name: install jdk , wget, unzip on ubuntu 
+      apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      loop:
+       - openjdk-8-jdk
+       - unzip 
+       - wget
+      when: ansible_facts['distribution']== "Ubuntu"
+# add group
+    - name: add tomcat group in ubuntu
+      group:
+        name: "{{ user_group }}"
+        state: present
+# add user        
+    - name: add tomcat user
+      user:
+        name: "{{ user_group }}"
+        home: "{{ tomcat_install_path }}"
+        group: "{{ user_group }}"
+        shell:  /bin/false
+        state: present
+      when: ansible_facts['distribution']== "Ubuntu"
+# download the application to temp        
+    - name: downlaod the tomacat zip file to tmp
+      get_url:
+        url: "{{ tomcat_source }}"
+        dest: "{{ tomcat_download_location }}"
+      when: ansible_facts['distribution']== "Ubuntu"
+# create stat to register the downloaded path so that it wont repeatedly download the tomcat
+    - name: gets status of the file
+      stat:
+        path: "{{tomcat_install_path}}"
+      register: tomcat_download_result
+
+# unzip the file
+    - name: unzip the tomcat file
+      unarchive:
+        src: "{{ tomcat_download_location }}"
+        dest: "{{ tomcat_install_path }}"
+        remote_src: yes
+      when: ansible_facts['distribution']== "Ubuntu" and not tomcat_download_result.stat.exists
+      notify:
+        - create symbollic link
+        - give recursive ownership
+        - give execute permision to path
+# copy tomcat.service to the destination 
+    - name: copy tomcat service to the systemd
+      template:
+        src: tomcat.service.j2
+        dest: /etc/systemd/system/tomcat.service.j2
+  #    notify:
+   #     - daemon reload and start tomcat
+  #handlers:
+# start and enable tomcat service
+    - name: daemon reload and start tomcat
+      systemd:
+        name: tomcat
+        enabled: yes
+        state: started
+        daemon_reload: yes
+  handlers:
+# create symbollic link
+    - name: create symbollic link
+      file:
+        src: "{{ symbollic_link }}"
+        dest: "/opt/tomcat/latest"
+        owner: "{{ user_group }}"
+        group: "{{ user_group }}"
+        state: link
+
+# give recursive permision to path
+    - name: give recursive ownership
+      file:
+        path: "{{ tomcat_install_path }}"
+        recurse: yes
+        owner: "{{ user_group }}"
+
+# give execute permision to path
+    - name: give execute permision to path
+      file: 
+        path: "{{ item }}"
+        mode: "+x"
+        remote_src: yes
+      loop:
+        - /opt/tomcat/latest/bin/catalina.sh
+        - /opt/tomcat/latest/bin/ciphers.sh
+        - /opt/tomcat/latest/bin/configtest.sh
+        - /opt/tomcat/latest/bin/daemon.sh
+        - /opt/tomcat/latest/bin/digest.sh
+        - /opt/tomcat/latest/bin/setclasspath.sh
+        - /opt/tomcat/latest/bin/shutdown.sh
+        - /opt/tomcat/latest/bin/startup.sh
+        - /opt/tomcat/latest/bin/tool-wrapper.sh
+        - /opt/tomcat/latest/bin/version.sh
