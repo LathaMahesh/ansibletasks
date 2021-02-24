@@ -1,6 +1,6 @@
 ---
 - name: installing tomact on ubuntu machine
-  hosts: appserver
+  hosts: all
   become: yes
 # Define variables  
   vars:
