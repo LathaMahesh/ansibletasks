@@ -1,6 +1,6 @@
 ---
 - name: restart tomcat service
-  hosts: appserver
+  hosts: all
   become: yes
   tasks:
     - name: restart the service
