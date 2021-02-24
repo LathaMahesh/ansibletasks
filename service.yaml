@@ -1,0 +1,22 @@
+---
+- name: restart tomcat service
+  hosts: appserver
+  become: yes
+  tasks:
+    - name: restart the service
+      service:
+        name: tomcat
+        state: restarted
+      register: service_status
+    - name: print if the restart is success
+      debug:
+       msg: " service is success"
+      when: service_status is success
+    - name: print if the service is unchanged
+      debug:
+        msg: " service is failed"
+      when: service_status is not success
+    - name: print if the service is changed
+      debug:
+        msg: " service is changed"
+      when: service_status is changed
